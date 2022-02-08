@@ -35,13 +35,13 @@ InitApp(app_memory *AppMemory)
     Platform->InsertComboText(ID_COMBO_METHOD, L"GET");
     Platform->InsertComboText(ID_COMBO_METHOD, L"POST");
     Platform->SetComboSelectedIndex(ID_COMBO_METHOD, 1);
-    Platform->AddEdit(ID_GROUP_URL, ID_EDIT_URL, L"www.google.co.uk", SIZE_FILL);
+    Platform->AddEdit(ID_GROUP_URL, ID_EDIT_URL, L"localhost", SIZE_FILL);
     Platform->SetControlMargin(ID_EDIT_URL, 2.0f, 8.0f, 8.0f, 2.0f);
     Platform->AddButton(ID_GROUP_URL, ID_BUTTON_SEND, L"Send", 48.0f);
     
     Platform->AddGroupBox(ID_PANEL_MAIN, ID_GROUP_REQUEST, L"Request", 128.0f, ControlLayout_Verticle);
     Platform->SetControlMargin(ID_GROUP_REQUEST, 4.0f, 4.0f, 8.0f, 4.0f);
-    Platform->AddEdit(ID_GROUP_REQUEST, ID_EDIT_REQUEST_RAW, L"GET / HTTP/1.1\r\n\r\n", SIZE_FILL);
+    Platform->AddEdit(ID_GROUP_REQUEST, ID_EDIT_REQUEST_RAW, L"GET / HTTP/1.1\r\nHost: localhost\r\nUser-Agent: kurl/debug\r\nAccept: */*\r\n\r\n", SIZE_FILL);
     
     Platform->AddGroupBox(ID_PANEL_MAIN, ID_GROUP_RESPONSE, L"Response", SIZE_FILL, ControlLayout_Verticle);
     Platform->SetControlMargin(ID_GROUP_RESPONSE, 4.0f, 4.0f, 8.0f, 8.0f);
