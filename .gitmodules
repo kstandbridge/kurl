@@ -1,0 +1,3 @@
+[submodule "library/kengine"]
+	path = library/kengine
+	url = https://github.com/kstandbridge/kengine.git
