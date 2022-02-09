@@ -33,7 +33,7 @@ if "%~1"=="RELEASE" (
 ) else (
 
 	REM kengine.dll
-	cl %CommonCompilerFlags% -MTd -Od -I..\kurl\library\kengine\code\ ..\kurl\code\kurl.cpp /LD /link %CommonLinkerFlags% -out:Qui.dll -PDB:kengine_%random%.pdb -EXPORT:InitApp -EXPORT:HandleCommand -EXPORT:CheckboxChanged -EXPORT:GetListViewText -EXPORT:HandleListViewItemChanged
+	cl %CommonCompilerFlags% -MTd -Od -I..\kurl\library\kengine\code\ ..\kurl\code\kurl.cpp /LD /link %CommonLinkerFlags% -out:kengine.dll -PDB:kengine_%random%.pdb -EXPORT:InitApp -EXPORT:HandleCommand -EXPORT:CheckboxChanged -EXPORT:GetListViewText -EXPORT:HandleListViewItemChanged
 
 	REM Skip trying to build GalaQ.exe if currently running
 	FOR /F %%x IN ('tasklist /NH /FI "IMAGENAME eq win32_shell.exe"') DO IF %%x == win32_shell.exe goto FOUND
