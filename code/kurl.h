@@ -29,8 +29,8 @@ LogMessage.Data = LogBuffer; \
 Platform->DebugLog(TimeStamp, L"debug", LogMessage); } \
 
 
-#include "qui_platform.h"
-#include "qui_shared.h"
+#include "kengine_platform.h"
+#include "kengine_shared.h"
 
 struct request_history
 {

@@ -32,16 +32,16 @@ if "%~1"=="RELEASE" (
 
 ) else (
 
-	REM qui.dll
-	cl %CommonCompilerFlags% -MTd -Od -I..\kurl\library\qui\code\ ..\kurl\code\kurl.cpp /LD /link %CommonLinkerFlags% -out:Qui.dll -PDB:qui_%random%.pdb -EXPORT:InitApp -EXPORT:HandleCommand -EXPORT:CheckboxChanged -EXPORT:GetListViewText -EXPORT:HandleListViewItemChanged
+	REM kengine.dll
+	cl %CommonCompilerFlags% -MTd -Od -I..\kurl\library\kengine\code\ ..\kurl\code\kurl.cpp /LD /link %CommonLinkerFlags% -out:Qui.dll -PDB:kengine_%random%.pdb -EXPORT:InitApp -EXPORT:HandleCommand -EXPORT:CheckboxChanged -EXPORT:GetListViewText -EXPORT:HandleListViewItemChanged
 
 	REM Skip trying to build GalaQ.exe if currently running
 	FOR /F %%x IN ('tasklist /NH /FI "IMAGENAME eq win32_shell.exe"') DO IF %%x == win32_shell.exe goto FOUND
 	
 	REM win32_shell.exe
-	rc -nologo ..\kurl\library\qui\code\win32_resource.rc
-	cl %CommonCompilerFlags% -MTd -Od ..\kurl\library\qui\code\win32_shell.cpp ..\kurl\library\qui\code\win32_resource.res /link -out:kurl.exe %CommonLinkerFlags%
-	del /q ..\kurl\library\qui\code\win32_resource.res
+	rc -nologo ..\kurl\library\kengine\code\win32_gui_resource.rc
+	cl %CommonCompilerFlags% -MTd -Od ..\kurl\library\kengine\code\win32_gui_kengine.cpp ..\kurl\library\kengine\code\win32_gui_resource.res /link -out:kurl.exe %CommonLinkerFlags%
+	del /q ..\kurl\library\kengine\code\win32_gui_resource.res
 
 )
 
