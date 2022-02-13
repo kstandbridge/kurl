@@ -17,20 +17,49 @@
 #define ID_GROUP_RESPONSE    1500
 #define ID_EDIT_RESPONSE_RAW 1501
 
-
-#define Log(Format, ...) { \
-u64 TimeStamp = Platform->GetSystemTimeStamp(); \
-wchar_t LogBuffer[1024]; \
-FormatString(sizeof(LogBuffer), LogBuffer, Format, __VA_ARGS__); \
-string LogMessage; \
-LogMessage.Length = StringLength(LogBuffer); \
-LogMessage.Size = (LogMessage.Length + 1)*sizeof(wchar_t); \
-LogMessage.Data = LogBuffer; \
-Platform->DebugLog(TimeStamp, L"debug", LogMessage); } \
-
-
 #include "kengine_platform.h"
 #include "kengine_shared.h"
+#include "kengine_log.h"
+
+enum http_method
+{
+    HttpMethod_Post,
+    HttpMethod_Get,
+    HttpMethod_Put,
+    HttpMethod_Delete,
+    
+    HttpMethod_Count
+};
+
+inline wchar_t *
+HttpMethodToString(http_method HttpMethod)
+{
+    wchar_t *Result = 0;
+    
+    switch(HttpMethod)
+    {
+        case HttpMethod_Post:
+        {
+            Result = L"POST";
+        } break;
+        case HttpMethod_Get:
+        {
+            Result = L"GET";
+        } break;
+        case HttpMethod_Put:
+        {
+            Result = L"PUT";
+        } break;
+        case HttpMethod_Delete:
+        {
+            Result = L"DELETE";
+        } break;
+        
+        InvalidDefaultCase;
+    }
+    
+    return Result;
+}
 
 struct request_history
 {

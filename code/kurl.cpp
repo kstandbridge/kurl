@@ -2,6 +2,211 @@
 
 global_variable platform_api *Platform;
 
+internal void
+GenerateRequest(app_state *AppState)
+{
+    wchar_t UrlBuffer[280];
+    Platform->GetControlText(ID_EDIT_URL, UrlBuffer, sizeof(UrlBuffer));
+    
+    wchar_t PathBuffer[280] = {0};
+    wchar_t *Path = FindFirstOccurrence(UrlBuffer, L"/");
+    wchar_t HostBuffer[280] = {0};
+    if(Path == 0)
+    {
+        wchar_t *DefaultPath = L"/";
+        Copy(StringLength(DefaultPath)*sizeof(wchar_t), DefaultPath, PathBuffer);
+    }
+    else
+    {
+        Copy(StringLength(Path)*sizeof(wchar_t), Path, PathBuffer);
+        Path[0] = '\0';
+    }
+    Copy(StringLength(UrlBuffer)*sizeof(wchar_t), UrlBuffer, HostBuffer);
+    
+    
+    temporary_memory TempMemory = BeginTemporaryMemory(&AppState->TransientArena);
+    
+    wchar_t *At;
+    string RequestRaw = BeginPushString(TempMemory.Arena, &At);
+    s32 SelectedIndex = Platform->GetComboSelectedIndex(ID_COMBO_METHOD);
+    ContinuePushString(TempMemory.Arena, &RequestRaw, HttpMethodToString((http_method)SelectedIndex), &At);
+    ContinuePushString(TempMemory.Arena, &RequestRaw, L" ", &At);
+    ContinuePushString(TempMemory.Arena, &RequestRaw, PathBuffer, &At);
+    ContinuePushString(TempMemory.Arena, &RequestRaw, L" HTTP/1.1\r\nHost: ", &At);
+    ContinuePushString(TempMemory.Arena, &RequestRaw, HostBuffer, &At);
+    ContinuePushString(TempMemory.Arena, &RequestRaw, L"\r\nUser-Agent: kurl/debug\r\nAccept: */*\r\n\r\n", &At);
+    EndPushString(TempMemory.Arena, &RequestRaw);
+    
+    Platform->SetControlText(ID_EDIT_REQUEST_RAW, RequestRaw.Data);
+    
+    EndTemporaryMemory(TempMemory);
+    CheckArena(&AppState->TransientArena);
+}
+
+struct http_parse_state;
+typedef void http_parse_function(http_parse_state *State);
+
+internal void ParseHttpValue_(http_parse_state *State);
+internal void ParseHttpKey_(http_parse_state *State);
+internal void ParseHttpHeader_(http_parse_state *State);
+
+struct key_value
+{
+    struct key_value *Next;
+    
+    string Key;
+    string Value;
+};
+
+struct http_response
+{
+    string Version;
+    s32 Code;
+    string CodeValue;
+    
+    key_value KeyValues;
+    
+    u32 ContentLength;
+    string Content;
+    
+};
+
+struct http_parse_state
+{
+    http_parse_function *Next;
+    
+    memory_arena *Arena;
+    
+    wchar_t *Source;
+    u32 SourceLength;
+    u32 SourceIndex;
+    
+    wchar_t Lexer[256];
+    u32 LexerIndex;
+    
+    http_response *Context;
+    key_value *CurrentKeyValue;
+};
+
+internal void
+ParseHttpValue_(http_parse_state *State)
+{
+    while((State->SourceIndex <= State->SourceLength) &&
+          !IsEndOfLine(State->Source[State->SourceIndex]))
+    {
+        State->Lexer[State->LexerIndex++] = State->Source[State->SourceIndex++];
+    }
+    State->Lexer[State->LexerIndex] = '\0';
+    State->SourceIndex += 2;
+    
+    State->CurrentKeyValue->Value = PushString(State->Arena, State->Lexer);
+    State->LexerIndex = 0;
+    
+    if((State->SourceIndex <= State->SourceLength) &&
+       IsEndOfLine(State->Source[State->SourceIndex]))
+    {
+        State->SourceIndex += 2;
+        // TODO(kstandbridge): Parse data
+        State->Next = 0;
+    }
+    else
+    {
+        State->Next = ParseHttpKey_;
+    }
+}
+
+internal void
+ParseHttpKey_(http_parse_state *State)
+{
+    while((State->SourceIndex <= State->SourceLength) &&
+          State->Source[State->SourceIndex] != ':')
+    {
+        State->Lexer[State->LexerIndex++] = State->Source[State->SourceIndex++];
+    }
+    State->Lexer[State->LexerIndex] = '\0';
+    State->SourceIndex += 2;
+    
+    if(State->CurrentKeyValue == 0)
+    {
+        State->CurrentKeyValue = &State->Context->KeyValues;
+    }
+    else
+    {
+        State->CurrentKeyValue->Next = PushStruct(State->Arena, key_value);
+        State->CurrentKeyValue = State->CurrentKeyValue->Next;
+    }
+    
+    State->CurrentKeyValue->Key = PushString(State->Arena, State->Lexer);
+    State->LexerIndex = 0;
+    
+    State->Next = ParseHttpValue_;
+    
+}
+
+internal void
+ParseHttpHeader_(http_parse_state *State)
+{
+    Assert(State->Source[State->SourceIndex] == 'H');
+    Assert(State->Source[State->SourceIndex + 1] == 'T');
+    Assert(State->Source[State->SourceIndex + 2] == 'T');
+    Assert(State->Source[State->SourceIndex + 3] == 'P');
+    State->SourceIndex += 5;
+    
+    for(s32 Index = 0;
+        Index < 3;
+        ++Index)
+    {
+        while((State->SourceIndex <= State->SourceLength) &&
+              !IsWhitespace(State->Source[State->SourceIndex]))
+        {
+            State->Lexer[State->LexerIndex++] = State->Source[State->SourceIndex++];
+        }
+        State->Lexer[State->LexerIndex] = '\0';
+        ++State->SourceIndex;
+        
+        if(Index == 0)
+        {
+            State->Context->Version = PushString(State->Arena, State->Lexer);
+        }
+        else if(Index == 1)
+        {
+            State->Context->Code = S32FromZ(State->Lexer);
+        }
+        else if(Index == 2)
+        {
+            State->Context->CodeValue = PushString(State->Arena, State->Lexer);
+        }
+        else
+        {
+            InvalidCodePath;
+        }
+        State->LexerIndex = 0;
+    }
+    ++State->SourceIndex;
+    
+    State->Next = ParseHttpKey_;
+}
+
+internal http_response
+ParseHttp(memory_arena *Arena, wchar_t *Source, u32 SourceLength)
+{
+    http_response Result;
+    
+    http_parse_state State = {0};
+    State.Next = ParseHttpHeader_;
+    State.Arena = Arena;
+    State.Source = Source;
+    State.SourceLength = SourceLength;
+    State.Context = &Result;
+    while(State.Next)
+    {
+        State.Next(&State);
+    }
+    
+    return Result;
+}
+
+
 extern "C" void
 InitApp(app_memory *AppMemory)
 {
@@ -17,6 +222,8 @@ InitApp(app_memory *AppMemory)
                         AppMemory->TransientStorageSize,
                         AppMemory->TransientStorage);
         
+        InitTasks(Platform, &AppState->TransientArena, 128, Kilobytes(8));
+        
         AppState->IsInitialized = false;
     }
     Platform->AddPanel(ID_WINDOW, ID_MAIN, SIZE_FILL, ControlLayout_Horizontal);
@@ -31,30 +238,38 @@ InitApp(app_memory *AppMemory)
     
     Platform->AddGroupBox(ID_PANEL_MAIN, ID_GROUP_URL, L"Url", 58.0f, ControlLayout_Horizontal);
     Platform->SetControlMargin(ID_GROUP_URL, 8.0f, 4.0f, 8.0f, 4.0f);
-    Platform->AddCombobox(ID_GROUP_URL, ID_COMBO_METHOD, 58.0f);
-    Platform->InsertComboText(ID_COMBO_METHOD, L"GET");
-    Platform->InsertComboText(ID_COMBO_METHOD, L"POST");
+    Platform->AddCombobox(ID_GROUP_URL, ID_COMBO_METHOD, 64.0f);
+    
+    for(s32 Method = HttpMethod_Post;
+        Method != HttpMethod_Count;
+        ++Method)
+    {
+        Platform->InsertComboText(ID_COMBO_METHOD, HttpMethodToString((http_method)Method));
+    }
+    
+    
     Platform->SetComboSelectedIndex(ID_COMBO_METHOD, 1);
-    Platform->AddEdit(ID_GROUP_URL, ID_EDIT_URL, L"localhost", SIZE_FILL);
+    Platform->AddEdit(ID_GROUP_URL, ID_EDIT_URL, L"echo.jsontest.com/key/value/one/two", SIZE_FILL);
     Platform->SetControlMargin(ID_EDIT_URL, 2.0f, 8.0f, 8.0f, 2.0f);
     Platform->AddButton(ID_GROUP_URL, ID_BUTTON_SEND, L"Send", 48.0f);
     
     Platform->AddGroupBox(ID_PANEL_MAIN, ID_GROUP_REQUEST, L"Request", 128.0f, ControlLayout_Verticle);
     Platform->SetControlMargin(ID_GROUP_REQUEST, 4.0f, 4.0f, 8.0f, 4.0f);
-    Platform->AddEdit(ID_GROUP_REQUEST, ID_EDIT_REQUEST_RAW, L"GET / HTTP/1.1\r\nHost: localhost\r\nUser-Agent: kurl/debug\r\nAccept: */*\r\n\r\n", SIZE_FILL);
+    Platform->AddEdit(ID_GROUP_REQUEST, ID_EDIT_REQUEST_RAW, L"", SIZE_FILL);
     
     Platform->AddGroupBox(ID_PANEL_MAIN, ID_GROUP_RESPONSE, L"Response", SIZE_FILL, ControlLayout_Verticle);
     Platform->SetControlMargin(ID_GROUP_RESPONSE, 4.0f, 4.0f, 8.0f, 8.0f);
-    Platform->AddEdit(ID_GROUP_RESPONSE, ID_EDIT_RESPONSE_RAW, L"{}", SIZE_FILL);
+    Platform->AddEdit(ID_GROUP_RESPONSE, ID_EDIT_RESPONSE_RAW, L"HTTP/1.1 200 OK\r\nAccess-Control-Allow-Origin: *\r\nContent-Type: application/json\r\nX-Cloud-Trace-Context: 2d4c80dcee32574d5f104326a004fec7\r\nDate: Sun, 13 Feb 2022 16:46:36 GMT\r\nServer: Google Frontend\r\nContent-Length: 39\r\n\r\n{   \"one\": \"two\",   \"key\": \"value\"}\r\n", SIZE_FILL);
     
-    Log(L"Controls Loaded...");
+    LogDebug(L"Controls Loaded...");
+    GenerateRequest(AppState);
 }
 
 
 extern "C" void
 HandleCommand(app_memory *AppMemory, s64 ControlId)
 {
-    Log(L"HandleCommand(ConrolId: %d)", ControlId);
+    LogDebug(L"HandleCommand(ConrolId: %d)", ControlId);
     app_state *AppState = (app_state *)AppMemory->PermanentStorage;
     
     if(ControlId == ID_BUTTON_SEND)
@@ -68,16 +283,21 @@ HandleCommand(app_memory *AppMemory, s64 ControlId)
         }
         Tail->Next = PushStruct(&AppState->TransientArena, request_history);
         Tail = Tail->Next;
+        Tail->Next = 0;
         
         
         local_persist u8 Code = 100;
-        wchar_t Buffer[256];
+        wchar_t Buffer[2048];
         FormatString(sizeof(Buffer), Buffer, L"%d", ++Code);
         Tail->Code = PushString(&AppState->TransientArena, Buffer);;
-        
         Platform->GetControlText(ID_COMBO_METHOD, Buffer, sizeof(Buffer));
         Tail->Method = PushString(&AppState->TransientArena, Buffer);
         Platform->GetControlText(ID_EDIT_URL, Buffer, sizeof(Buffer));
+        wchar_t *HostnameEnd = FindFirstOccurrence(Buffer, L"/");
+        if(HostnameEnd)
+        {
+            HostnameEnd[0] = '\0';
+        }
         Tail->Url = PushString(&AppState->TransientArena, Buffer);
         char Url[256];
         Utf16ToChar((char *)Buffer, Url, StringLength(Buffer));
@@ -86,8 +306,19 @@ HandleCommand(app_memory *AppMemory, s64 ControlId)
         char RequestRaw[256];
         Utf16ToChar((char *)Buffer, RequestRaw, StringLength(Buffer));
         s32 RequestLength = StringLength(RequestRaw);
+        
+        
         Tail->ResponseRaw = Platform->SendHttpRequest(&AppState->TransientArena, Url, RequestRaw, RequestLength);
         
+        http_response Response = ParseHttp(&AppState->TransientArena, Tail->ResponseRaw.Data, Tail->ResponseRaw.Length);
+        LogDebug(L"Got response code: %d", Response.Code);
+        
+        for(key_value *KeyValue = &Response.KeyValues;
+            KeyValue != 0;
+            KeyValue = KeyValue->Next)
+        {
+            LogDebug(L"%S: %S", KeyValue->Key, KeyValue->Value);
+        }
         
         Platform->SetListViewItemCount(ID_LIST_HISTORY, RequestHistoryCount);
         Platform->AutoSizeListViewColumn(ID_LIST_HISTORY, 0);
@@ -104,7 +335,7 @@ HandleCommand(app_memory *AppMemory, s64 ControlId)
 extern "C" void
 HandleListViewItemChanged(app_memory *AppMemory, s64 ControlId, s32 Row)
 {
-    Log(L"HandleListViewItemChanged(ControlId: %d, Row: %d)", ControlId, Row);
+    LogDebug(L"HandleListViewItemChanged(ControlId: %d, Row: %d)", ControlId, Row);
     app_state *AppState = (app_state *)AppMemory->PermanentStorage;
     
     if(ControlId == ID_LIST_HISTORY)
@@ -182,4 +413,32 @@ GetListViewText(app_memory *AppMemory, s64 ControlId, s32 Column, s32 Row)
     }
     
     return Result;
+}
+
+extern "C" void
+LogWorkCallback(platform_work_queue *Queue, void *Data)
+{
+    
+}
+
+// TODO(kstandbridge): Combo changed
+extern "C" void
+ComboChanged(app_memory *AppMemory, s64 ControlId)
+{
+    app_state *AppState = (app_state *)AppMemory->PermanentStorage;
+    
+    GenerateRequest(AppState);
+}
+
+// TODO(kstandbridge): Edit changed
+extern "C" void
+EditChanged(app_memory *AppMemory, s64 ControlId)
+{
+    app_state *AppState = (app_state *)AppMemory->PermanentStorage;
+    
+    if(ControlId == ID_EDIT_URL)
+    {
+        GenerateRequest(AppState);
+    }
+    
 }
