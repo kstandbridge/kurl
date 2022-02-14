@@ -213,6 +213,8 @@ InitApp(app_memory *AppMemory)
     Platform = &AppMemory->PlatformApi;
     
     app_state *AppState = (app_state *)AppMemory->PermanentStorage;
+    Assert(!AppState->IsInitialized);
+    
     if(!AppState->IsInitialized)
     {
         InitializeArena(&AppState->PermanentArena, 
@@ -224,45 +226,49 @@ InitApp(app_memory *AppMemory)
         
         InitTasks(Platform, &AppState->TransientArena, 128, Kilobytes(8));
         
-        AppState->IsInitialized = false;
+        Platform->AddPanel(ID_WINDOW, ID_MAIN, SIZE_FILL, ControlLayout_Horizontal);
+        
+        Platform->AddGroupBox(ID_MAIN, ID_GROUP_HISTORY, L"History", 314.0f, ControlLayout_Verticle);
+        Platform->SetControlMargin(ID_GROUP_HISTORY, 8.0f, 8.0f, 4.0f, 8.0f);
+        Platform->AddListView(ID_GROUP_HISTORY, ID_LIST_HISTORY, SIZE_FILL);
+        Platform->AddListViewColumn(ID_LIST_HISTORY, 0, L"Code");
+        Platform->AddListViewColumn(ID_LIST_HISTORY, 1, L"Method");
+        Platform->AddListViewColumn(ID_LIST_HISTORY, 2, L"Url");
+        Platform->AddPanel(ID_MAIN, ID_PANEL_MAIN, SIZE_FILL, ControlLayout_Verticle);
+        
+        Platform->AddGroupBox(ID_PANEL_MAIN, ID_GROUP_URL, L"Url", 58.0f, ControlLayout_Horizontal);
+        Platform->SetControlMargin(ID_GROUP_URL, 8.0f, 4.0f, 8.0f, 4.0f);
+        Platform->AddCombobox(ID_GROUP_URL, ID_COMBO_METHOD, 64.0f);
+        
+        for(s32 Method = HttpMethod_Post;
+            Method != HttpMethod_Count;
+            ++Method)
+        {
+            Platform->InsertComboText(ID_COMBO_METHOD, HttpMethodToString((http_method)Method));
+        }
+        
+        
+        Platform->SetComboSelectedIndex(ID_COMBO_METHOD, 1);
+        Platform->AddEdit(ID_GROUP_URL, ID_EDIT_URL, L"echo.jsontest.com/key/value/one/two", SIZE_FILL);
+        Platform->SetControlMargin(ID_EDIT_URL, 2.0f, 8.0f, 8.0f, 2.0f);
+        Platform->AddButton(ID_GROUP_URL, ID_BUTTON_SEND, L"Send", 48.0f);
+        
+        Platform->AddGroupBox(ID_PANEL_MAIN, ID_GROUP_REQUEST, L"Request", 128.0f, ControlLayout_Verticle);
+        Platform->SetControlMargin(ID_GROUP_REQUEST, 4.0f, 4.0f, 8.0f, 4.0f);
+        Platform->AddEditMultiline(ID_GROUP_REQUEST, ID_EDIT_REQUEST_RAW, L"", SIZE_FILL);
+        
+        Platform->AddGroupBox(ID_PANEL_MAIN, ID_GROUP_RESPONSE, L"Response", SIZE_FILL, ControlLayout_Verticle);
+        Platform->SetControlMargin(ID_GROUP_RESPONSE, 4.0f, 4.0f, 8.0f, 8.0f);
+        Platform->AddEditMultiline(ID_GROUP_RESPONSE, ID_EDIT_RESPONSE_RAW, L"", SIZE_FILL);
+        
+        LogDebug(L"Controls Loaded...");
+        
+        AppState->IsInitialized = true;
+        
+        GenerateRequest(AppState);
     }
-    Platform->AddPanel(ID_WINDOW, ID_MAIN, SIZE_FILL, ControlLayout_Horizontal);
-    
-    Platform->AddGroupBox(ID_MAIN, ID_GROUP_HISTORY, L"History", 314.0f, ControlLayout_Verticle);
-    Platform->SetControlMargin(ID_GROUP_HISTORY, 8.0f, 8.0f, 4.0f, 8.0f);
-    Platform->AddListView(ID_GROUP_HISTORY, ID_LIST_HISTORY, SIZE_FILL);
-    Platform->AddListViewColumn(ID_LIST_HISTORY, 0, L"Code");
-    Platform->AddListViewColumn(ID_LIST_HISTORY, 1, L"Method");
-    Platform->AddListViewColumn(ID_LIST_HISTORY, 2, L"Url");
-    Platform->AddPanel(ID_MAIN, ID_PANEL_MAIN, SIZE_FILL, ControlLayout_Verticle);
-    
-    Platform->AddGroupBox(ID_PANEL_MAIN, ID_GROUP_URL, L"Url", 58.0f, ControlLayout_Horizontal);
-    Platform->SetControlMargin(ID_GROUP_URL, 8.0f, 4.0f, 8.0f, 4.0f);
-    Platform->AddCombobox(ID_GROUP_URL, ID_COMBO_METHOD, 64.0f);
-    
-    for(s32 Method = HttpMethod_Post;
-        Method != HttpMethod_Count;
-        ++Method)
-    {
-        Platform->InsertComboText(ID_COMBO_METHOD, HttpMethodToString((http_method)Method));
-    }
     
     
-    Platform->SetComboSelectedIndex(ID_COMBO_METHOD, 1);
-    Platform->AddEdit(ID_GROUP_URL, ID_EDIT_URL, L"echo.jsontest.com/key/value/one/two", SIZE_FILL);
-    Platform->SetControlMargin(ID_EDIT_URL, 2.0f, 8.0f, 8.0f, 2.0f);
-    Platform->AddButton(ID_GROUP_URL, ID_BUTTON_SEND, L"Send", 48.0f);
-    
-    Platform->AddGroupBox(ID_PANEL_MAIN, ID_GROUP_REQUEST, L"Request", 128.0f, ControlLayout_Verticle);
-    Platform->SetControlMargin(ID_GROUP_REQUEST, 4.0f, 4.0f, 8.0f, 4.0f);
-    Platform->AddEdit(ID_GROUP_REQUEST, ID_EDIT_REQUEST_RAW, L"", SIZE_FILL);
-    
-    Platform->AddGroupBox(ID_PANEL_MAIN, ID_GROUP_RESPONSE, L"Response", SIZE_FILL, ControlLayout_Verticle);
-    Platform->SetControlMargin(ID_GROUP_RESPONSE, 4.0f, 4.0f, 8.0f, 8.0f);
-    Platform->AddEdit(ID_GROUP_RESPONSE, ID_EDIT_RESPONSE_RAW, L"", SIZE_FILL);
-    
-    LogDebug(L"Controls Loaded...");
-    GenerateRequest(AppState);
 }
 
 
@@ -425,18 +431,33 @@ extern "C" void
 ComboChanged(app_memory *AppMemory, s64 ControlId)
 {
     app_state *AppState = (app_state *)AppMemory->PermanentStorage;
-    
-    GenerateRequest(AppState);
+    if(AppState->IsInitialized)
+    {
+        if(ControlId == ID_COMBO_METHOD)
+        {
+            GenerateRequest(AppState);
+        }
+        else
+        {
+            LogError(L"Unknown combo box changed id: %d", ControlId);
+        }
+    }
 }
 
 extern "C" void
 EditChanged(app_memory *AppMemory, s64 ControlId)
 {
     app_state *AppState = (app_state *)AppMemory->PermanentStorage;
-    
-    if(ControlId == ID_EDIT_URL)
-    {
-        GenerateRequest(AppState);
+    if(AppState->IsInitialized)
+    {        
+        if(ControlId == ID_EDIT_URL)
+        {
+            GenerateRequest(AppState);
+        }
+        else
+        {
+            LogError(L"Unknown edit changed id: %d", ControlId);
+        }
     }
     
 }
