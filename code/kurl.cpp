@@ -259,7 +259,7 @@ InitApp(app_memory *AppMemory)
     
     Platform->AddGroupBox(ID_PANEL_MAIN, ID_GROUP_RESPONSE, L"Response", SIZE_FILL, ControlLayout_Verticle);
     Platform->SetControlMargin(ID_GROUP_RESPONSE, 4.0f, 4.0f, 8.0f, 8.0f);
-    Platform->AddEdit(ID_GROUP_RESPONSE, ID_EDIT_RESPONSE_RAW, L"HTTP/1.1 200 OK\r\nAccess-Control-Allow-Origin: *\r\nContent-Type: application/json\r\nX-Cloud-Trace-Context: 2d4c80dcee32574d5f104326a004fec7\r\nDate: Sun, 13 Feb 2022 16:46:36 GMT\r\nServer: Google Frontend\r\nContent-Length: 39\r\n\r\n{   \"one\": \"two\",   \"key\": \"value\"}\r\n", SIZE_FILL);
+    Platform->AddEdit(ID_GROUP_RESPONSE, ID_EDIT_RESPONSE_RAW, L"", SIZE_FILL);
     
     LogDebug(L"Controls Loaded...");
     GenerateRequest(AppState);
@@ -421,7 +421,6 @@ LogWorkCallback(platform_work_queue *Queue, void *Data)
     
 }
 
-// TODO(kstandbridge): Combo changed
 extern "C" void
 ComboChanged(app_memory *AppMemory, s64 ControlId)
 {
@@ -430,7 +429,6 @@ ComboChanged(app_memory *AppMemory, s64 ControlId)
     GenerateRequest(AppState);
 }
 
-// TODO(kstandbridge): Edit changed
 extern "C" void
 EditChanged(app_memory *AppMemory, s64 ControlId)
 {
