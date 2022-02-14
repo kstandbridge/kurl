@@ -20,6 +20,7 @@
 #include "kengine_platform.h"
 #include "kengine_shared.h"
 #include "kengine_log.h"
+#include "kengine_http.h"
 
 enum http_method
 {

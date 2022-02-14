@@ -1,4 +1,5 @@
 #include "kurl.h"
+#include "kengine_http.cpp"
 
 global_variable platform_api *Platform;
 
@@ -8,8 +9,17 @@ GenerateRequest(app_state *AppState)
     wchar_t UrlBuffer[280];
     Platform->GetControlText(ID_EDIT_URL, UrlBuffer, sizeof(UrlBuffer));
     
+    wchar_t *UrlPtr = UrlBuffer;
+    if(StringBeginsWith(UrlBuffer, L"https://"))
+    {
+        UrlPtr += 8;
+    }
+    else if(StringBeginsWith(UrlBuffer, L"http://"))
+    {
+        UrlPtr += 7;
+    }
     wchar_t PathBuffer[280] = {0};
-    wchar_t *Path = FindFirstOccurrence(UrlBuffer, L"/");
+    wchar_t *Path = FindFirstOccurrence(UrlPtr, L"/");
     wchar_t HostBuffer[280] = {0};
     if(Path == 0)
     {
@@ -21,7 +31,7 @@ GenerateRequest(app_state *AppState)
         Copy(StringLength(Path)*sizeof(wchar_t), Path, PathBuffer);
         Path[0] = '\0';
     }
-    Copy(StringLength(UrlBuffer)*sizeof(wchar_t), UrlBuffer, HostBuffer);
+    Copy(StringLength(UrlPtr)*sizeof(wchar_t), UrlPtr, HostBuffer);
     
     
     temporary_memory TempMemory = BeginTemporaryMemory(&AppState->TransientArena);
@@ -41,169 +51,6 @@ GenerateRequest(app_state *AppState)
     
     EndTemporaryMemory(TempMemory);
     CheckArena(&AppState->TransientArena);
-}
-
-struct http_parse_state;
-typedef void http_parse_function(http_parse_state *State);
-
-internal void ParseHttpValue_(http_parse_state *State);
-internal void ParseHttpKey_(http_parse_state *State);
-internal void ParseHttpHeader_(http_parse_state *State);
-
-struct key_value
-{
-    struct key_value *Next;
-    
-    string Key;
-    string Value;
-};
-
-struct http_response
-{
-    string Version;
-    s32 Code;
-    string CodeValue;
-    
-    key_value KeyValues;
-    
-    u32 ContentLength;
-    string Content;
-    
-};
-
-struct http_parse_state
-{
-    http_parse_function *Next;
-    
-    memory_arena *Arena;
-    
-    wchar_t *Source;
-    u32 SourceLength;
-    u32 SourceIndex;
-    
-    wchar_t Lexer[256];
-    u32 LexerIndex;
-    
-    http_response *Context;
-    key_value *CurrentKeyValue;
-};
-
-internal void
-ParseHttpValue_(http_parse_state *State)
-{
-    while((State->SourceIndex <= State->SourceLength) &&
-          !IsEndOfLine(State->Source[State->SourceIndex]))
-    {
-        State->Lexer[State->LexerIndex++] = State->Source[State->SourceIndex++];
-    }
-    State->Lexer[State->LexerIndex] = '\0';
-    State->SourceIndex += 2;
-    
-    State->CurrentKeyValue->Value = PushString(State->Arena, State->Lexer);
-    State->LexerIndex = 0;
-    
-    if((State->SourceIndex <= State->SourceLength) &&
-       IsEndOfLine(State->Source[State->SourceIndex]))
-    {
-        State->SourceIndex += 2;
-        // TODO(kstandbridge): Parse data
-        State->Next = 0;
-    }
-    else
-    {
-        State->Next = ParseHttpKey_;
-    }
-}
-
-internal void
-ParseHttpKey_(http_parse_state *State)
-{
-    while((State->SourceIndex <= State->SourceLength) &&
-          State->Source[State->SourceIndex] != ':')
-    {
-        State->Lexer[State->LexerIndex++] = State->Source[State->SourceIndex++];
-    }
-    State->Lexer[State->LexerIndex] = '\0';
-    State->SourceIndex += 2;
-    
-    if(State->CurrentKeyValue == 0)
-    {
-        State->CurrentKeyValue = &State->Context->KeyValues;
-    }
-    else
-    {
-        State->CurrentKeyValue->Next = PushStruct(State->Arena, key_value);
-        State->CurrentKeyValue = State->CurrentKeyValue->Next;
-    }
-    
-    State->CurrentKeyValue->Key = PushString(State->Arena, State->Lexer);
-    State->LexerIndex = 0;
-    
-    State->Next = ParseHttpValue_;
-    
-}
-
-internal void
-ParseHttpHeader_(http_parse_state *State)
-{
-    Assert(State->Source[State->SourceIndex] == 'H');
-    Assert(State->Source[State->SourceIndex + 1] == 'T');
-    Assert(State->Source[State->SourceIndex + 2] == 'T');
-    Assert(State->Source[State->SourceIndex + 3] == 'P');
-    State->SourceIndex += 5;
-    
-    for(s32 Index = 0;
-        Index < 3;
-        ++Index)
-    {
-        while((State->SourceIndex <= State->SourceLength) &&
-              !IsWhitespace(State->Source[State->SourceIndex]))
-        {
-            State->Lexer[State->LexerIndex++] = State->Source[State->SourceIndex++];
-        }
-        State->Lexer[State->LexerIndex] = '\0';
-        ++State->SourceIndex;
-        
-        if(Index == 0)
-        {
-            State->Context->Version = PushString(State->Arena, State->Lexer);
-        }
-        else if(Index == 1)
-        {
-            State->Context->Code = S32FromZ(State->Lexer);
-        }
-        else if(Index == 2)
-        {
-            State->Context->CodeValue = PushString(State->Arena, State->Lexer);
-        }
-        else
-        {
-            InvalidCodePath;
-        }
-        State->LexerIndex = 0;
-    }
-    ++State->SourceIndex;
-    
-    State->Next = ParseHttpKey_;
-}
-
-internal http_response
-ParseHttp(memory_arena *Arena, wchar_t *Source, u32 SourceLength)
-{
-    http_response Result;
-    
-    http_parse_state State = {0};
-    State.Next = ParseHttpHeader_;
-    State.Arena = Arena;
-    State.Source = Source;
-    State.SourceLength = SourceLength;
-    State.Context = &Result;
-    while(State.Next)
-    {
-        State.Next(&State);
-    }
-    
-    return Result;
 }
 
 
@@ -249,7 +96,7 @@ InitApp(app_memory *AppMemory)
         
         
         Platform->SetComboSelectedIndex(ID_COMBO_METHOD, 1);
-        Platform->AddEdit(ID_GROUP_URL, ID_EDIT_URL, L"echo.jsontest.com/key/value/one/two", SIZE_FILL);
+        Platform->AddEdit(ID_GROUP_URL, ID_EDIT_URL, L"localhost", SIZE_FILL);
         Platform->SetControlMargin(ID_EDIT_URL, 2.0f, 8.0f, 8.0f, 2.0f);
         Platform->AddButton(ID_GROUP_URL, ID_BUTTON_SEND, L"Send", 48.0f);
         
@@ -291,33 +138,50 @@ HandleCommand(app_memory *AppMemory, s64 ControlId)
         Tail = Tail->Next;
         Tail->Next = 0;
         
-        
-        local_persist u8 Code = 100;
+        b32 IsHttps = false;
+        __debugbreak();
         wchar_t Buffer[2048];
-        FormatString(sizeof(Buffer), Buffer, L"%d", ++Code);
-        Tail->Code = PushString(&AppState->TransientArena, Buffer);;
         Platform->GetControlText(ID_COMBO_METHOD, Buffer, sizeof(Buffer));
         Tail->Method = PushString(&AppState->TransientArena, Buffer);
         Platform->GetControlText(ID_EDIT_URL, Buffer, sizeof(Buffer));
-        wchar_t *HostnameEnd = FindFirstOccurrence(Buffer, L"/");
+        Tail->Url = PushString(&AppState->TransientArena, Buffer);
+        __debugbreak();
+        wchar_t *UrlPtr = Buffer;
+        if(StringBeginsWith(Buffer, L"https://"))
+        {
+            UrlPtr += 8;
+            IsHttps = true;
+        }
+        else if(StringBeginsWith(Buffer, L"http://"))
+        {
+            UrlPtr += 7;
+        }
+        
+        wchar_t *HostnameEnd = FindFirstOccurrence(UrlPtr, L"/");
         if(HostnameEnd)
         {
             HostnameEnd[0] = '\0';
         }
-        Tail->Url = PushString(&AppState->TransientArena, Buffer);
         char Url[256];
-        Utf16ToChar((char *)Buffer, Url, StringLength(Buffer));
+        Utf16ToChar((char *)UrlPtr, Url, StringLength(UrlPtr));
         Platform->GetControlText(ID_EDIT_REQUEST_RAW, Buffer, sizeof(Buffer));
         Tail->RequestRaw = PushString(&AppState->TransientArena, Buffer);
         char RequestRaw[256];
         Utf16ToChar((char *)Buffer, RequestRaw, StringLength(Buffer));
         s32 RequestLength = StringLength(RequestRaw);
-        
-        
-        Tail->ResponseRaw = Platform->SendHttpRequest(&AppState->TransientArena, Url, RequestRaw, RequestLength);
+        if(IsHttps)
+        {
+            __debugbreak();
+            Tail->ResponseRaw = PushString(&AppState->TransientArena, "");;
+        }
+        else
+        {
+            Tail->ResponseRaw = Platform->SendHttpRequest(&AppState->TransientArena, Url, RequestRaw, RequestLength);
+        }
         
         http_response Response = ParseHttp(&AppState->TransientArena, Tail->ResponseRaw.Data, Tail->ResponseRaw.Length);
-        LogDebug(L"Got response code: %d", Response.Code);
+        FormatString(sizeof(Buffer), Buffer, L"%d %s", Response.StatusCode, HttpStatusCodeToString(Response.StatusCode));
+        Tail->Code = PushString(&AppState->TransientArena, Buffer);
         
         for(key_value *KeyValue = &Response.KeyValues;
             KeyValue != 0;
