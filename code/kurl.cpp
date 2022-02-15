@@ -96,7 +96,7 @@ InitApp(app_memory *AppMemory)
         
         
         Platform->SetComboSelectedIndex(ID_COMBO_METHOD, 1);
-        Platform->AddEdit(ID_GROUP_URL, ID_EDIT_URL, L"localhost", SIZE_FILL);
+        Platform->AddEdit(ID_GROUP_URL, ID_EDIT_URL, L"https://localhost", SIZE_FILL);
         Platform->SetControlMargin(ID_EDIT_URL, 2.0f, 8.0f, 8.0f, 2.0f);
         Platform->AddButton(ID_GROUP_URL, ID_BUTTON_SEND, L"Send", 48.0f);
         
@@ -118,7 +118,6 @@ InitApp(app_memory *AppMemory)
     
 }
 
-
 extern "C" void
 HandleCommand(app_memory *AppMemory, s64 ControlId)
 {
@@ -139,13 +138,11 @@ HandleCommand(app_memory *AppMemory, s64 ControlId)
         Tail->Next = 0;
         
         b32 IsHttps = false;
-        __debugbreak();
         wchar_t Buffer[2048];
         Platform->GetControlText(ID_COMBO_METHOD, Buffer, sizeof(Buffer));
         Tail->Method = PushString(&AppState->TransientArena, Buffer);
         Platform->GetControlText(ID_EDIT_URL, Buffer, sizeof(Buffer));
         Tail->Url = PushString(&AppState->TransientArena, Buffer);
-        __debugbreak();
         wchar_t *UrlPtr = Buffer;
         if(StringBeginsWith(Buffer, L"https://"))
         {
@@ -166,13 +163,12 @@ HandleCommand(app_memory *AppMemory, s64 ControlId)
         Utf16ToChar((char *)UrlPtr, Url, StringLength(UrlPtr));
         Platform->GetControlText(ID_EDIT_REQUEST_RAW, Buffer, sizeof(Buffer));
         Tail->RequestRaw = PushString(&AppState->TransientArena, Buffer);
-        char RequestRaw[256];
+        char RequestRaw[32768];
         Utf16ToChar((char *)Buffer, RequestRaw, StringLength(Buffer));
         s32 RequestLength = StringLength(RequestRaw);
         if(IsHttps)
         {
-            __debugbreak();
-            Tail->ResponseRaw = PushString(&AppState->TransientArena, "");;
+            Tail->ResponseRaw = Platform->SendHttpsRequest(&AppState->TransientArena, Url, RequestRaw, RequestLength);
         }
         else
         {
