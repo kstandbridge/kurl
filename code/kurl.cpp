@@ -46,7 +46,6 @@ GenerateRequest(app_state *AppState)
     ContinuePushString(TempMemory.Arena, &RequestRaw, HostBuffer, &At);
     ContinuePushString(TempMemory.Arena, &RequestRaw, L"\r\nUser-Agent: kurl/debug\r\nAccept: */*\r\n\r\n", &At);
     EndPushString(TempMemory.Arena, &RequestRaw);
-    
     Platform->SetControlText(ID_EDIT_REQUEST_RAW, RequestRaw.Data);
     
     EndTemporaryMemory(TempMemory);
