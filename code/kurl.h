@@ -14,8 +14,31 @@
 #define ID_GROUP_REQUEST    1400
 #define ID_EDIT_REQUEST_RAW 1401
 
-#define ID_GROUP_RESPONSE    1500
-#define ID_EDIT_RESPONSE_RAW 1501
+#define ID_GROUP_RESPONSE                1500
+#define ID_PANEL_RESPONSE                1501
+#define ID_GROUP_RESPONSE_COMMON_HEADERS 1502
+
+#define ID_PANEL_RESPONSE_VERSION        1510
+#define ID_STATIC_RESPONSE_VERSION       1511
+#define ID_EDIT_RESPONSE_VERSION         1512
+
+#define ID_PANEL_RESPONSE_CODE           1520
+#define ID_STATIC_RESPONSE_CODE          1521
+#define ID_EDIT_RESPONSE_CODE            1522
+
+#define ID_PANEL_RESPONSE_CONTENT_TYPE   1530
+#define ID_STATIC_RESPONSE_CONTENT_TYPE  1531
+#define ID_EDIT_RESPONSE_CONTENT_TYPE    1532
+
+#define ID_PANEL_RESPONSE_CONTENT_LENGTH   1540
+#define ID_STATIC_RESPONSE_CONTENT_LENGTH  1541
+#define ID_EDIT_RESPONSE_CONTENT_LENGTH    1542
+
+#define ID_GROUP_RESPONSE_MISC_HEADERS   1700
+#define ID_LIST_RESPONSE_MISC_HEADERS    1701
+
+#define ID_GROUP_RESPONSE_RAW            1800
+#define ID_EDIT_RESPONSE_RAW             1801
 
 #include "kengine_platform.h"
 #include "kengine_shared.h"
@@ -66,13 +89,12 @@ struct request_history
 {
     struct request_history *Next;
     
-    // TODO(kstandbridge): code as enum and converstation to string
-    string Code;
-    
     string Method;
     string Url;
     string RequestRaw;
     string ResponseRaw;
+    
+    http_response Response;
 };
 
 struct app_state
@@ -83,6 +105,7 @@ struct app_state
     memory_arena TransientArena;
     
     request_history RequestHistory;
+    request_history *SelectedRequestHistory;
 };
 
 #define QUI_H

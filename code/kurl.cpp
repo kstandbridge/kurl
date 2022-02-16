@@ -54,70 +54,6 @@ GenerateRequest(app_state *AppState)
 
 
 extern "C" void
-InitApp(app_memory *AppMemory)
-{
-    Platform = &AppMemory->PlatformApi;
-    
-    app_state *AppState = (app_state *)AppMemory->PermanentStorage;
-    Assert(!AppState->IsInitialized);
-    
-    if(!AppState->IsInitialized)
-    {
-        InitializeArena(&AppState->PermanentArena, 
-                        AppMemory->PermanentStorageSize - sizeof(app_state), 
-                        (u8 *)AppMemory->PermanentStorage + sizeof(app_state));
-        InitializeArena(&AppState->TransientArena,
-                        AppMemory->TransientStorageSize,
-                        AppMemory->TransientStorage);
-        
-        InitTasks(Platform, &AppState->TransientArena, 128, Kilobytes(8));
-        
-        Platform->AddPanel(ID_WINDOW, ID_MAIN, SIZE_FILL, ControlLayout_Horizontal);
-        
-        Platform->AddGroupBox(ID_MAIN, ID_GROUP_HISTORY, L"History", 314.0f, ControlLayout_Verticle);
-        Platform->SetControlMargin(ID_GROUP_HISTORY, 8.0f, 8.0f, 4.0f, 8.0f);
-        Platform->AddListView(ID_GROUP_HISTORY, ID_LIST_HISTORY, SIZE_FILL);
-        Platform->AddListViewColumn(ID_LIST_HISTORY, 0, L"Code");
-        Platform->AddListViewColumn(ID_LIST_HISTORY, 1, L"Method");
-        Platform->AddListViewColumn(ID_LIST_HISTORY, 2, L"Url");
-        Platform->AddPanel(ID_MAIN, ID_PANEL_MAIN, SIZE_FILL, ControlLayout_Verticle);
-        
-        Platform->AddGroupBox(ID_PANEL_MAIN, ID_GROUP_URL, L"Url", 58.0f, ControlLayout_Horizontal);
-        Platform->SetControlMargin(ID_GROUP_URL, 8.0f, 4.0f, 8.0f, 4.0f);
-        Platform->AddCombobox(ID_GROUP_URL, ID_COMBO_METHOD, 64.0f);
-        
-        for(s32 Method = HttpMethod_Post;
-            Method != HttpMethod_Count;
-            ++Method)
-        {
-            Platform->InsertComboText(ID_COMBO_METHOD, HttpMethodToString((http_method)Method));
-        }
-        
-        
-        Platform->SetComboSelectedIndex(ID_COMBO_METHOD, 1);
-        Platform->AddEdit(ID_GROUP_URL, ID_EDIT_URL, L"https://localhost", SIZE_FILL);
-        Platform->SetControlMargin(ID_EDIT_URL, 2.0f, 8.0f, 8.0f, 2.0f);
-        Platform->AddButton(ID_GROUP_URL, ID_BUTTON_SEND, L"Send", 48.0f);
-        
-        Platform->AddGroupBox(ID_PANEL_MAIN, ID_GROUP_REQUEST, L"Request", 128.0f, ControlLayout_Verticle);
-        Platform->SetControlMargin(ID_GROUP_REQUEST, 4.0f, 4.0f, 8.0f, 4.0f);
-        Platform->AddEditMultiline(ID_GROUP_REQUEST, ID_EDIT_REQUEST_RAW, L"", SIZE_FILL);
-        
-        Platform->AddGroupBox(ID_PANEL_MAIN, ID_GROUP_RESPONSE, L"Response", SIZE_FILL, ControlLayout_Verticle);
-        Platform->SetControlMargin(ID_GROUP_RESPONSE, 4.0f, 4.0f, 8.0f, 8.0f);
-        Platform->AddEditMultiline(ID_GROUP_RESPONSE, ID_EDIT_RESPONSE_RAW, L"", SIZE_FILL);
-        
-        LogDebug(L"Controls Loaded...");
-        
-        AppState->IsInitialized = true;
-        
-        GenerateRequest(AppState);
-    }
-    
-    
-}
-
-extern "C" void
 HandleCommand(app_memory *AppMemory, s64 ControlId)
 {
     LogDebug(L"HandleCommand(ConrolId: %d)", ControlId);
@@ -174,18 +110,11 @@ HandleCommand(app_memory *AppMemory, s64 ControlId)
             Tail->ResponseRaw = Platform->SendHttpRequest(&AppState->TransientArena, Url, RequestRaw, RequestLength);
         }
         
-        http_response Response = ParseHttp(&AppState->TransientArena, Tail->ResponseRaw.Data, Tail->ResponseRaw.Length);
-        FormatString(sizeof(Buffer), Buffer, L"%d %s", Response.StatusCode, HttpStatusCodeToString(Response.StatusCode));
-        Tail->Code = PushString(&AppState->TransientArena, Buffer);
-        
-        for(key_value *KeyValue = &Response.KeyValues;
-            KeyValue != 0;
-            KeyValue = KeyValue->Next)
-        {
-            LogDebug(L"%S: %S", KeyValue->Key, KeyValue->Value);
-        }
+        Tail->Response = ParseHttp(&AppState->TransientArena, Tail->ResponseRaw.Data, Tail->ResponseRaw.Length);;
         
         Platform->SetListViewItemCount(ID_LIST_HISTORY, RequestHistoryCount);
+        Platform->SetListViewSelectedItem(ID_LIST_HISTORY, RequestHistoryCount - 1);
+        
         Platform->AutoSizeListViewColumn(ID_LIST_HISTORY, 0);
         Platform->AutoSizeListViewColumn(ID_LIST_HISTORY, 1);
         Platform->AutoSizeListViewColumn(ID_LIST_HISTORY, 2);
@@ -195,6 +124,115 @@ HandleCommand(app_memory *AppMemory, s64 ControlId)
         Platform->ShowMessageBox(L"Error", L"Unknown ControlId");
         __debugbreak();
     }
+}
+
+extern "C" void
+
+InitApp(app_memory *AppMemory)
+{
+    Platform = &AppMemory->PlatformApi;
+    
+    app_state *AppState = (app_state *)AppMemory->PermanentStorage;
+    Assert(!AppState->IsInitialized);
+    
+    if(!AppState->IsInitialized)
+    {
+        InitializeArena(&AppState->PermanentArena, 
+                        AppMemory->PermanentStorageSize - sizeof(app_state), 
+                        (u8 *)AppMemory->PermanentStorage + sizeof(app_state));
+        InitializeArena(&AppState->TransientArena,
+                        AppMemory->TransientStorageSize,
+                        AppMemory->TransientStorage);
+        
+        InitTasks(Platform, &AppState->TransientArena, 128, Kilobytes(8));
+        
+        Platform->AddPanel(ID_WINDOW, ID_MAIN, SIZE_FILL, ControlLayout_Horizontal);
+        
+        Platform->AddGroupBox(ID_MAIN, ID_GROUP_HISTORY, L"History", 314.0f, ControlLayout_Verticle);
+        Platform->SetControlMargin(ID_GROUP_HISTORY, 8.0f, 8.0f, 4.0f, 8.0f);
+        Platform->AddListView(ID_GROUP_HISTORY, ID_LIST_HISTORY, SIZE_FILL);
+        Platform->AddListViewColumn(ID_LIST_HISTORY, 0, L"Code");
+        Platform->AddListViewColumn(ID_LIST_HISTORY, 1, L"Method");
+        Platform->AddListViewColumn(ID_LIST_HISTORY, 2, L"Url");
+        Platform->AddPanel(ID_MAIN, ID_PANEL_MAIN, SIZE_FILL, ControlLayout_Verticle);
+        
+        Platform->AddGroupBox(ID_PANEL_MAIN, ID_GROUP_URL, L"Url", 58.0f, ControlLayout_Horizontal);
+        Platform->SetControlMargin(ID_GROUP_URL, 8.0f, 4.0f, 8.0f, 4.0f);
+        Platform->AddCombobox(ID_GROUP_URL, ID_COMBO_METHOD, 64.0f);
+        
+        for(s32 Method = HttpMethod_Post;
+            Method != HttpMethod_Count;
+            ++Method)
+        {
+            Platform->InsertComboText(ID_COMBO_METHOD, HttpMethodToString((http_method)Method));
+        }
+        
+        
+        Platform->SetComboSelectedIndex(ID_COMBO_METHOD, 1);
+        Platform->AddEdit(ID_GROUP_URL, ID_EDIT_URL, L"http://localhost", SIZE_FILL);
+        Platform->SetControlMargin(ID_EDIT_URL, 2.0f, 8.0f, 8.0f, 2.0f);
+        Platform->AddButton(ID_GROUP_URL, ID_BUTTON_SEND, L"Send", 48.0f);
+        
+        Platform->AddGroupBox(ID_PANEL_MAIN, ID_GROUP_REQUEST, L"Request", 128.0f, ControlLayout_Verticle);
+        Platform->SetControlMargin(ID_GROUP_REQUEST, 4.0f, 4.0f, 8.0f, 4.0f);
+        Platform->AddEditMultiline(ID_GROUP_REQUEST, ID_EDIT_REQUEST_RAW, L"", SIZE_FILL);
+        
+        Platform->AddGroupBox(ID_PANEL_MAIN, ID_GROUP_RESPONSE, L"Response", SIZE_FILL, ControlLayout_Horizontal);
+        Platform->SetControlMargin(ID_GROUP_RESPONSE, 4.0f, 4.0f, 8.0f, 8.0f);
+        Platform->AddPanel(ID_GROUP_RESPONSE, ID_PANEL_RESPONSE, 256.0f, ControlLayout_Verticle);
+        
+        Platform->AddGroupBox(ID_PANEL_RESPONSE, ID_GROUP_RESPONSE_COMMON_HEADERS, L"Common Headers:", SIZE_FILL, ControlLayout_Verticle);
+        
+        f32 CommonHeaderLabelWidth = 80.0f;
+        // TODO(kstandbridge): enum HttpVersion
+        // TODO(kstandbridge): combo box http version
+        Platform->AddPanel(ID_GROUP_RESPONSE_COMMON_HEADERS, ID_PANEL_RESPONSE_VERSION, 16.0f, ControlLayout_Horizontal);
+        Platform->AddStatic(ID_PANEL_RESPONSE_VERSION, ID_STATIC_RESPONSE_VERSION, L"Version:", CommonHeaderLabelWidth);
+        Platform->AddEdit(ID_PANEL_RESPONSE_VERSION, ID_EDIT_RESPONSE_VERSION, L"", SIZE_FILL);
+        Platform->SetEditReadOnly(ID_EDIT_RESPONSE_VERSION, true);
+        
+        // TODO(kstandbridge): combo box response code
+        Platform->AddPanel(ID_GROUP_RESPONSE_COMMON_HEADERS, ID_PANEL_RESPONSE_CODE, 16.0f, ControlLayout_Horizontal);
+        Platform->AddStatic(ID_PANEL_RESPONSE_CODE, ID_STATIC_RESPONSE_CODE, L"Code:", CommonHeaderLabelWidth);
+        Platform->AddEdit(ID_PANEL_RESPONSE_CODE, ID_EDIT_RESPONSE_CODE, L"", SIZE_FILL);
+        Platform->SetEditReadOnly(ID_EDIT_RESPONSE_CODE, true);
+        
+        // TODO(kstandbridge): combobox content type
+        Platform->AddPanel(ID_GROUP_RESPONSE_COMMON_HEADERS, ID_PANEL_RESPONSE_CONTENT_TYPE, 16.0f, ControlLayout_Horizontal);
+        Platform->AddStatic(ID_PANEL_RESPONSE_CONTENT_TYPE, ID_STATIC_RESPONSE_CONTENT_TYPE, L"Content-Type:", CommonHeaderLabelWidth);
+        Platform->AddEdit(ID_PANEL_RESPONSE_CONTENT_TYPE, ID_EDIT_RESPONSE_CONTENT_TYPE, L"", SIZE_FILL);
+        Platform->SetEditReadOnly(ID_EDIT_RESPONSE_CONTENT_TYPE, true);
+        
+        // TODO(kstandbridge): Charset?
+        // TODO(kstandbridge): combobox charset
+        
+        // TODO(kstandbridge): Content Length
+        Platform->AddPanel(ID_GROUP_RESPONSE_COMMON_HEADERS, ID_PANEL_RESPONSE_CONTENT_LENGTH, 16.0f, ControlLayout_Horizontal);
+        Platform->AddStatic(ID_PANEL_RESPONSE_CONTENT_LENGTH, ID_STATIC_RESPONSE_CONTENT_LENGTH, L"Content-Length:", CommonHeaderLabelWidth);
+        Platform->AddEdit(ID_PANEL_RESPONSE_CONTENT_LENGTH, ID_EDIT_RESPONSE_CONTENT_LENGTH, L"", SIZE_FILL);
+        Platform->SetEditReadOnly(ID_EDIT_RESPONSE_CONTENT_LENGTH, true);
+        
+        Platform->AddSpacer(ID_GROUP_RESPONSE_COMMON_HEADERS, SIZE_FILL);
+        
+        
+        Platform->AddGroupBox(ID_PANEL_RESPONSE, ID_GROUP_RESPONSE_MISC_HEADERS, L"Misc Headers:", SIZE_FILL, ControlLayout_Verticle);
+        Platform->AddListView(ID_GROUP_RESPONSE_MISC_HEADERS, ID_LIST_RESPONSE_MISC_HEADERS, SIZE_FILL);
+        Platform->AddListViewColumn(ID_LIST_RESPONSE_MISC_HEADERS, 0, L"Key");
+        Platform->AddListViewColumn(ID_LIST_RESPONSE_MISC_HEADERS, 1, L"Value");
+        
+        Platform->AddGroupBox(ID_GROUP_RESPONSE, ID_GROUP_RESPONSE_RAW, L"Raw", SIZE_FILL, ControlLayout_Verticle);
+        Platform->SetControlMargin(ID_GROUP_RESPONSE_RAW, 0.0f, 8.0f, 0.0f, 0.0f);
+        Platform->AddEditMultiline(ID_GROUP_RESPONSE_RAW, ID_EDIT_RESPONSE_RAW, L"", SIZE_FILL);
+        
+        LogDebug(L"Controls Loaded...");
+        
+        AppState->IsInitialized = true;
+        
+        GenerateRequest(AppState);
+        HandleCommand(AppMemory, ID_BUTTON_SEND);
+    }
+    
+    
 }
 
 extern "C" void
@@ -223,10 +261,31 @@ HandleListViewItemChanged(app_memory *AppMemory, s64 ControlId, s32 Row)
                 ++Index;
             } while(Index <= Row);
             
+            AppState->SelectedRequestHistory = RequestHistory;
+            
             // TODO(kstandbridge): Select the correct index of the Method? I really need an emum for that
             Platform->SetControlText(ID_EDIT_URL, RequestHistory->Url.Data);
             Platform->SetControlText(ID_EDIT_REQUEST_RAW, RequestHistory->RequestRaw.Data);
             Platform->SetControlText(ID_EDIT_RESPONSE_RAW, RequestHistory->ResponseRaw.Data);
+            
+            http_response *Response = &RequestHistory->Response;
+            Platform->SetControlText(ID_EDIT_RESPONSE_VERSION, Response->Version.Data);
+            wchar_t Buffer[64];
+            FormatString(sizeof(Buffer), Buffer, L"%d %s", Response->StatusCode, HttpStatusCodeToString(Response->StatusCode));
+            Platform->SetControlText(ID_EDIT_RESPONSE_CODE, Buffer);
+            Platform->SetControlText(ID_EDIT_RESPONSE_CONTENT_TYPE, HttpContentTypeToString(Response->ContentType));
+            FormatString(sizeof(Buffer), Buffer, L"%d", Response->ContentLength);
+            Platform->SetControlText(ID_EDIT_RESPONSE_CONTENT_LENGTH, Buffer);
+            
+            s32 HeadersCount = 0;
+            for(key_value *Header = &RequestHistory->Response.Headers;
+                Header != 0;
+                Header = Header->Next)
+            {
+                LogDebug(L"%S: %S", Header->Key, Header->Value);
+                ++HeadersCount;
+            }
+            Platform->SetListViewItemCount(ID_LIST_RESPONSE_MISC_HEADERS, HeadersCount);
         }
     }
     
@@ -244,6 +303,7 @@ GetListViewText(app_memory *AppMemory, s64 ControlId, s32 Column, s32 Row)
     wchar_t *Result = 0;
     
     app_state *AppState = (app_state *)AppMemory->PermanentStorage;
+    
     if(ControlId == ID_LIST_HISTORY)
     {
         request_history *RequestHistory = &AppState->RequestHistory;
@@ -256,7 +316,7 @@ GetListViewText(app_memory *AppMemory, s64 ControlId, s32 Column, s32 Row)
         
         if(Column == 0)
         {
-            Result = RequestHistory->Code.Data;
+            Result = HttpStatusCodeToString(RequestHistory->Response.StatusCode);
         }
         else if(Column == 1)
         {
@@ -270,6 +330,39 @@ GetListViewText(app_memory *AppMemory, s64 ControlId, s32 Column, s32 Row)
         {
             Result = L"Unknown column";
         }
+    }
+    else if(ControlId == ID_LIST_RESPONSE_MISC_HEADERS)
+    {
+        if(AppState->SelectedRequestHistory)
+        {
+            key_value *ResponseHeader = &AppState->SelectedRequestHistory->Response.Headers;
+            s32 Index = 0;
+            while(Index <= (Row - 1))
+            {
+                ResponseHeader = ResponseHeader->Next;
+                ++Index;
+            }
+            
+            if(Column == 0)
+            {
+                Result = ResponseHeader->Key.Data;
+            }
+            else if(Column == 1)
+            {
+                Result = ResponseHeader->Value.Data;
+            }
+            else
+            {
+                Result = L"Unknown column";
+            }
+            
+        }
+        else
+        {
+            Result = L"No request selected";
+        }
+        
+        
     }
     else
     {
@@ -315,8 +408,7 @@ EditChanged(app_memory *AppMemory, s64 ControlId)
         }
         else
         {
-            LogError(L"Unknown edit changed id: %d", ControlId);
+            //LogError(L"Unknown edit changed id: %d", ControlId);
         }
     }
-    
 }
