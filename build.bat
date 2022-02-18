@@ -38,10 +38,12 @@ if "%~1"=="RELEASE" (
 	REM Skip trying to build GalaQ.exe if currently running
 	FOR /F %%x IN ('tasklist /NH /FI "IMAGENAME eq win32_shell.exe"') DO IF %%x == win32_shell.exe goto FOUND
 	
-	REM win32_shell.exe
-	rc -nologo ..\kurl\library\kengine\code\win32_gui_resource.rc
-	cl %CommonCompilerFlags% -MTd -Od ..\kurl\library\kengine\code\win32_gui_kengine.cpp ..\kurl\library\kengine\code\win32_gui_resource.res /link -out:kurl.exe %CommonLinkerFlags%
-	del /q ..\kurl\library\kengine\code\win32_gui_resource.res
+	REM kurl.exe
+	rc -nologo ..\kurl\library\kengine\code\win32_kengine_resource.rc
+	cl %CommonCompilerFlags% -MTd -Od ..\kurl\library\kengine\code\win32_kengine_gui.cpp ..\kurl\library\kengine\code\win32_kengine_resource.res /link -out:kurl.exe %CommonLinkerFlags%
+	del /q ..\kurl\library\kengine\code\win32_kengine_resource.res
+
+	cl %CommonCompilerFlags% -MTd -Od ..\kurl\library\kengine\code\win32_kengine_http.cpp /link -out:krest.exe %CommonLinkerFlags%
 
 )
 
