@@ -101,6 +101,7 @@ HandleCommand(app_memory *AppMemory, s64 ControlId)
         char RequestRaw[32768];
         Utf16ToChar((char *)Buffer, RequestRaw, StringLength(Buffer));
         s32 RequestLength = StringLength(RequestRaw);
+        
         if(IsHttps)
         {
             Tail->ResponseRaw = Platform->SendHttpsRequest(&AppState->TransientArena, Url, RequestRaw, RequestLength);
@@ -110,7 +111,7 @@ HandleCommand(app_memory *AppMemory, s64 ControlId)
             Tail->ResponseRaw = Platform->SendHttpRequest(&AppState->TransientArena, Url, RequestRaw, RequestLength);
         }
         
-        Tail->Response = ParseHttp(&AppState->TransientArena, Tail->ResponseRaw.Data, Tail->ResponseRaw.Length);;
+        Tail->Response = ParseHttp(&AppState->TransientArena, Tail->ResponseRaw.Data, Tail->ResponseRaw.Length, HttpParsedType_Response);
         
         Platform->SetListViewItemCount(ID_LIST_HISTORY, RequestHistoryCount);
         Platform->SetListViewSelectedItem(ID_LIST_HISTORY, RequestHistoryCount - 1);
@@ -268,7 +269,7 @@ HandleListViewItemChanged(app_memory *AppMemory, s64 ControlId, s32 Row)
             Platform->SetControlText(ID_EDIT_REQUEST_RAW, RequestHistory->RequestRaw.Data);
             Platform->SetControlText(ID_EDIT_RESPONSE_RAW, RequestHistory->ResponseRaw.Data);
             
-            http_response *Response = &RequestHistory->Response;
+            http_parsed *Response = &RequestHistory->Response;
             Platform->SetControlText(ID_EDIT_RESPONSE_VERSION, Response->Version.Data);
             wchar_t Buffer[64];
             FormatString(sizeof(Buffer), Buffer, L"%d %s", Response->StatusCode, HttpStatusCodeToString(Response->StatusCode));

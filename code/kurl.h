@@ -94,7 +94,7 @@ struct request_history
     string RequestRaw;
     string ResponseRaw;
     
-    http_response Response;
+    http_parsed Response;
 };
 
 struct app_state
