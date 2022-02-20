@@ -36,16 +36,15 @@ GenerateRequest(app_state *AppState)
     
     temporary_memory TempMemory = BeginTemporaryMemory(&AppState->TransientArena);
     
-    wchar_t *At;
-    string RequestRaw = BeginPushString(TempMemory.Arena, &At);
+    format_string_state StringState = BeginFormatString(TempMemory.Arena);
+    
     s32 SelectedIndex = Platform->GetComboSelectedIndex(ID_COMBO_METHOD);
-    ContinuePushString(TempMemory.Arena, &RequestRaw, HttpMethodToString((http_method)SelectedIndex), &At);
-    ContinuePushString(TempMemory.Arena, &RequestRaw, L" ", &At);
-    ContinuePushString(TempMemory.Arena, &RequestRaw, PathBuffer, &At);
-    ContinuePushString(TempMemory.Arena, &RequestRaw, L" HTTP/1.1\r\nHost: ", &At);
-    ContinuePushString(TempMemory.Arena, &RequestRaw, HostBuffer, &At);
-    ContinuePushString(TempMemory.Arena, &RequestRaw, L"\r\nUser-Agent: kurl/debug\r\nAccept: */*\r\n\r\n", &At);
-    EndPushString(TempMemory.Arena, &RequestRaw);
+    AppendStringFormat(&StringState, L"%s %s HTTP/1.1\r\n", HttpMethodToString((http_method)SelectedIndex), PathBuffer);
+    AppendStringFormat(&StringState, L"Host: %s\r\n", HostBuffer);
+    AppendStringFormat(&StringState, L"User-Agent: kurl/debug\r\n");
+    AppendStringFormat(&StringState, L"Accept: */*\r\n\r\n");
+    string RequestRaw = EndFormatString(&StringState);
+    
     Platform->SetControlText(ID_EDIT_REQUEST_RAW, RequestRaw.Data);
     
     EndTemporaryMemory(TempMemory);
@@ -111,7 +110,10 @@ HandleCommand(app_memory *AppMemory, s64 ControlId)
             Tail->ResponseRaw = Platform->SendHttpRequest(&AppState->TransientArena, Url, RequestRaw, RequestLength);
         }
         
-        Tail->Response = ParseHttp(&AppState->TransientArena, Tail->ResponseRaw.Data, Tail->ResponseRaw.Length, HttpParsedType_Response);
+        if(Tail->ResponseRaw.Length)
+        {            
+            Tail->Response = ParseHttp(&AppState->TransientArena, Tail->ResponseRaw.Data, Tail->ResponseRaw.Length, HttpParsedType_Response);
+        }
         
         Platform->SetListViewItemCount(ID_LIST_HISTORY, RequestHistoryCount);
         Platform->SetListViewSelectedItem(ID_LIST_HISTORY, RequestHistoryCount - 1);
@@ -144,6 +146,7 @@ InitApp(app_memory *AppMemory)
         InitializeArena(&AppState->TransientArena,
                         AppMemory->TransientStorageSize,
                         AppMemory->TransientStorage);
+        
         
         InitTasks(Platform, &AppState->TransientArena, 128, Kilobytes(8));
         
@@ -269,24 +272,28 @@ HandleListViewItemChanged(app_memory *AppMemory, s64 ControlId, s32 Row)
             Platform->SetControlText(ID_EDIT_REQUEST_RAW, RequestHistory->RequestRaw.Data);
             Platform->SetControlText(ID_EDIT_RESPONSE_RAW, RequestHistory->ResponseRaw.Data);
             
-            http_parsed *Response = &RequestHistory->Response;
-            Platform->SetControlText(ID_EDIT_RESPONSE_VERSION, Response->Version.Data);
-            wchar_t Buffer[64];
-            FormatString(sizeof(Buffer), Buffer, L"%d %s", Response->StatusCode, HttpStatusCodeToString(Response->StatusCode));
-            Platform->SetControlText(ID_EDIT_RESPONSE_CODE, Buffer);
-            Platform->SetControlText(ID_EDIT_RESPONSE_CONTENT_TYPE, HttpContentTypeToString(Response->ContentType));
-            FormatString(sizeof(Buffer), Buffer, L"%d", Response->ContentLength);
-            Platform->SetControlText(ID_EDIT_RESPONSE_CONTENT_LENGTH, Buffer);
-            
-            s32 HeadersCount = 0;
-            for(key_value *Header = &RequestHistory->Response.Headers;
-                Header != 0;
-                Header = Header->Next)
-            {
-                LogDebug(L"%S: %S", Header->Key, Header->Value);
-                ++HeadersCount;
+            if(RequestHistory->ResponseRaw.Data)
+            {                
+                http_parsed *Response = &RequestHistory->Response;
+                Platform->SetControlText(ID_EDIT_RESPONSE_VERSION, Response->Version.Data);
+                wchar_t Buffer[64];
+                FormatString(Buffer, L"%d %s", Response->StatusCode, HttpStatusCodeToString(Response->StatusCode));
+                Platform->SetControlText(ID_EDIT_RESPONSE_CODE, Buffer);
+                Platform->SetControlText(ID_EDIT_RESPONSE_CONTENT_TYPE, HttpContentTypeToString(Response->ContentType));
+                FormatString(Buffer, L"%d", Response->ContentLength);
+                Platform->SetControlText(ID_EDIT_RESPONSE_CONTENT_LENGTH, Buffer);
+                
+                s32 HeadersCount = 0;
+                for(key_value *Header = &RequestHistory->Response.Headers;
+                    Header != 0;
+                    Header = Header->Next)
+                {
+                    LogDebug(L"%S: %S", Header->Key, Header->Value);
+                    ++HeadersCount;
+                }
+                Platform->SetListViewItemCount(ID_LIST_RESPONSE_MISC_HEADERS, HeadersCount);
             }
-            Platform->SetListViewItemCount(ID_LIST_RESPONSE_MISC_HEADERS, HeadersCount);
+            
         }
     }
     
