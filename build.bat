@@ -33,19 +33,16 @@ if "%~1"=="RELEASE" (
 ) else (
 
 	REM kengine_http.dll
-	cl %CommonCompilerFlags% -MTd -Od -I..\kurl\library\kengine\code\ ..\kurl\code\krest.cpp /LD /link %CommonLinkerFlags% -out:kengine_http.dll -PDB:kengine_http_%random%.pdb -EXPORT:HandleHttpCallback
+	REM cl %CommonCompilerFlags% -MTd -Od -I..\kurl\library\kengine\code\ ..\kurl\code\krest.cpp /LD /link %CommonLinkerFlags% -out:kengine_http.dll -PDB:kengine_http_%random%.pdb -EXPORT:HandleHttpCallback
 
 
 	REM krest.exe
-	cl %CommonCompilerFlags% -MTd -Od ..\kurl\library\kengine\code\win32_kengine_http.cpp /link -out:krest.exe %CommonLinkerFlags%
+	REM cl %CommonCompilerFlags% -MTd -Od ..\kurl\library\kengine\code\win32_kengine_http.cpp /link -out:krest.exe %CommonLinkerFlags%
 
 
 	REM kengine_gui.dll
 	cl %CommonCompilerFlags% -MTd -Od -I..\kurl\library\kengine\code\ ..\kurl\code\kurl.cpp /LD /link %CommonLinkerFlags% -out:kengine_gui.dll -PDB:kengine_gui_%random%.pdb -EXPORT:InitApp -EXPORT:HandleCommand -EXPORT:CheckboxChanged -EXPORT:GetListViewText -EXPORT:HandleListViewItemChanged -EXPORT:LogWorkCallback -EXPORT:EditChanged -EXPORT:ComboChanged
 
-	REM Skip trying to build GalaQ.exe if currently running
-	FOR /F %%x IN ('tasklist /NH /FI "IMAGENAME eq win32_shell.exe"') DO IF %%x == win32_shell.exe goto FOUND
-	
 	REM kurl.exe
 	rc -nologo ..\kurl\library\kengine\code\win32_kengine_resource.rc
 	cl %CommonCompilerFlags% -MTd -Od ..\kurl\library\kengine\code\win32_kengine_gui.cpp ..\kurl\library\kengine\code\win32_kengine_resource.res /link -out:kurl.exe %CommonLinkerFlags%
@@ -54,7 +51,6 @@ if "%~1"=="RELEASE" (
 
 )
 
-:FOUND
 del /q *.obj
 del lock.tmp
 popd

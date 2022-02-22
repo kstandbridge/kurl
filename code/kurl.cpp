@@ -173,7 +173,7 @@ InitApp(app_memory *AppMemory)
         
         
         Platform->SetComboSelectedIndex(ID_COMBO_METHOD, 1);
-        Platform->AddEdit(ID_GROUP_URL, ID_EDIT_URL, L"http://localhost", SIZE_FILL);
+        Platform->AddEdit(ID_GROUP_URL, ID_EDIT_URL, L"https://212-104-199-118.sslip.io", SIZE_FILL);
         Platform->SetControlMargin(ID_EDIT_URL, 2.0f, 8.0f, 8.0f, 2.0f);
         Platform->AddButton(ID_GROUP_URL, ID_BUTTON_SEND, L"Send", 48.0f);
         
@@ -233,7 +233,7 @@ InitApp(app_memory *AppMemory)
         AppState->IsInitialized = true;
         
         GenerateRequest(AppState);
-        HandleCommand(AppMemory, ID_BUTTON_SEND);
+        //HandleCommand(AppMemory, ID_BUTTON_SEND);
     }
     
     
